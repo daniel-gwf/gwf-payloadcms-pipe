@@ -17,7 +17,13 @@ on:
         required: true
         type: string
     secrets:
-
+      # Re-add GITHUB_TOKEN here.
+      # Defining it as required: false is a common workaround,
+      # but simply defining it without 'required' usually works too.
+      GITHUB_TOKEN:
+        description: 'The GitHub token used to perform API operations.'
+        # DO NOT add 'required: true' if you want to avoid strict checking,
+        # but to satisfy the caller, we must define it here.
       DEPLOY_HOOK_SECRET:
         required: true
 
