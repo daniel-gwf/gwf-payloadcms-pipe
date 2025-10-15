@@ -1,0 +1,83 @@
+# .github/workflows/main.yml
+name: 🚀 Main Scalable CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop # Automated CI runs here
+      - main    # Production deployment runs here
+      - staging # Example of a new branch
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+
+
+jobs:
+  # ==========================================================
+  # 1. CI / BUILD STAGE (Called for all relevant pushes)
+  # ==========================================================
+  ci_stage:
+    name: 🧪 CI for ${{ github.ref_name }}
+    uses: ./.github/workflows/build.yml
+    with:
+      node_version: '18'
+      ref: ${{ github.ref }}
+    #outputs:
+    #  release_version: ''${{ jobs.ci_stage.outputs.release_version }}''
+
+  # ==========================================================
+  # 2. UAT DEPLOYMENT (Triggered by Tag)
+  # ==========================================================
+  deploy_uat_stage:
+    name: 🌐 UAT Deployment
+    needs: ci_stage
+    # Only run for tags after CI passes
+    if: success() && startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment_name: UAT
+      release_version: ${{ needs.ci_stage.outputs.release_version }}
+      branch_name: ${{ github.ref_name }} # Passes the tag name
+      deploy_hook_secret_name: RENDER_UAT_HOOK
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEPLOY_HOOK_SECRET: ${{ secrets.RENDER_UAT_HOOK }}
+
+  # ==========================================================
+  # 3. PRODUCTION DEPLOYMENT (Triggered by main branch merge)
+  # ==========================================================
+  deploy_production_stage:
+    name: 🚀 Production Deployment
+    needs: ci_stage
+    # Only run when 'main' is pushed (after successful CI on the code being merged)
+    if: github.ref == 'refs/heads/main' && success()
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment_name: Production
+      release_version: ${{ needs.ci_stage.outputs.release_version }}
+      branch_name: ${{ github.ref_name }} # Passes the branch name 'main'
+      deploy_hook_secret_name: RENDER_PROD_HOOK
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEPLOY_HOOK_SECRET: ${{ secrets.RENDER_PROD_HOOK }}
+
+  # ==========================================================
+  # 4. EXAMPLE STAGING DEPLOYMENT (For new branches)
+  # ==========================================================
+  deploy_staging_stage:
+    name: ⚙️ Staging Deployment
+    needs: ci_stage
+    # Example: Runs on the 'staging' branch push
+    if: github.ref == 'refs/heads/staging' && success()
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment_name: Staging
+      release_version: ${{ needs.ci_stage.outputs.release_version }}
+      branch_name: ${{ github.ref_name }}
+      deploy_hook_secret_name: RENDER_STAGING_HOOK # You would need a new secret and Render service
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEPLOY_HOOK_SECRET: ${{ secrets.RENDER_STAGING_HOOK }}

@@ -1,0 +1,67 @@
+# .github/workflows/deploy.yml
+name: Reusable Deploy Stage
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        required: true
+        type: string
+      release_version:
+        required: true
+        type: string
+      branch_name:
+        required: true
+        type: string
+      deploy_hook_secret_name:
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+      DEPLOY_HOOK_SECRET:
+        required: true
+
+jobs:
+  deployment:
+    name: 🌐 Deploy to ${{ inputs.environment_name }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment_name }} # Uses the passed environment name for gating
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        run: |
+          echo "Deploying Release ${{ inputs.release_version }} from branch/tag ${{ inputs.branch_name }} to ${{ inputs.environment_name }}..."
+          # Uses the DEPLOY_HOOK_SECRET passed from the caller's secrets
+          curl -X POST ${{ secrets.DEPLOY_HOOK_SECRET }}
+          echo "${{ inputs.environment_name }} deployment triggered."
+          echo "Manual testing can now begin."
+
+      # CRITICAL: This step handles the PR creation, which is optional but useful for UAT visibility
+      - name: Create PR (from Branch/Tag to Base Branch)
+        if: inputs.environment_name == 'UAT' # Only create PR for UAT stage
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const releaseVersion = '${{ inputs.release_version }}'
+            const baseBranch = 'uat'
+            const headRef = `${{ inputs.branch_name }}`
+
+            const title = `Release ${releaseVersion} ready for UAT sign-off`
+            const body = `This deployment contains code from **${headRef}**.\n\n**Please sign off after successful UAT is complete.**`
+
+            try {
+              await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                head: headRef,
+                base: baseBranch
+              });
+              console.log(`Pull Request created to merge ${headRef} into ${baseBranch}.`);
+            } catch (error) {
+              console.log(`Could not create PR (likely already exists or no diff): ${error.message}`);
+            }

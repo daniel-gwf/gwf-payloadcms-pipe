@@ -1,0 +1,52 @@
+# .github/workflows/build.yml
+name: Reusable Build & CI
+
+on:
+  # Allows this workflow to be called from other workflows
+  workflow_call:
+    inputs:
+      node_version:
+        required: true
+        type: string
+        default: '18'
+      ref:
+        required: true
+        type: string
+    outputs:
+      release_version:
+        description: "The version used for deployment (from the Git reference name)"
+        value: ${{ jobs.build_and_lint.outputs.release_version }}
+
+jobs:
+  build_and_lint:
+    name: 🧪 Build & Lint
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.set_version.outputs.version }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }} # Use the reference passed from the caller
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+
+      - name: Install Dependencies & PNPM
+        run: |
+          npm install -g pnpm
+          npm ci
+
+      - name: Run Linting
+        run: npm run lint
+
+      - name: Build Application
+        run: echo "Code built successfully."
+
+      - name: Set Release Version Output
+        id: set_version
+        run: echo "version=$(echo ${{ inputs.ref }} | sed 's/refs\/\(heads\|tags\)\///')" >> $GITHUB_OUTPUT # Extracts branch or tag name
