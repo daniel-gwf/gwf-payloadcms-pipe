@@ -14,7 +14,6 @@ on:
 env:
   NODE_VERSION: '18'
 
-
 jobs:
   # ==========================================================
   # 1. CI / BUILD STAGE (Called for all relevant pushes)
@@ -26,7 +25,7 @@ jobs:
       node_version: '18'
       ref: ${{ github.ref }}
     #outputs:
-    #  release_version: ''${{ jobs.ci_stage.outputs.release_version }}''
+    #  release_version: ${{ jobs.ci_stage.outputs.release_version }}
 
   # ==========================================================
   # 2. UAT DEPLOYMENT (Triggered by Tag)
