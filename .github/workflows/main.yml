@@ -3,11 +3,11 @@ name: CI → Code-Review → UAT → Production
 
 on:
   push:
-    # 💡 FIX 1: Trigger pipeline on push to the develop branch
+    # Trigger pipeline on push/merge to the develop branch
     branches:
       - develop
   pull_request:
-    # 💡 FIX 2: Trigger pipeline on PRs targeting the develop branch
+    # Trigger pipeline on PRs targeting the develop branch
     branches:
       - develop
 
@@ -16,13 +16,12 @@ permissions:
 
 jobs:
   # ==========================================================
-  # 1. CI BUILD STAGE (Runs on every push/PR to develop)
+  # 1. CI BUILD STAGE (Mandatory first step)
   # ==========================================================
   ci-build:
     name: 🏗️ CI Build
     uses: ./.github/workflows/build.yml
     with:
-      # Pass 'develop' as the stage for artifact naming
       stage: develop
       node-version: '20'
       deployment_environment: ci
@@ -32,15 +31,12 @@ jobs:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  #
-  # 🟢 FIX: CODE REVIEW STAGE now correctly defines its purpose.
-  # This job creates a deployment environment for the PR branch (Code Review).
   # ==========================================================
-  # 2. CODE REVIEW STAGE (For PRs)
+  # 2. CODE REVIEW STAGE (New Mandatory Deployment Stage)
+  # 💡 FIX 1: Removed 'if: github.event_name == 'pull_request'' to ensure it runs on push/merge.
+  # This makes it a mandatory stage that UAT can depend on.
   # ==========================================================
   code-review:
-    # 🟢 CONDITION: Runs ONLY on Pull Requests targeting 'develop'.
-    if: github.event_name == 'pull_request'
     needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
@@ -51,19 +47,15 @@ jobs:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  #
-  # 🟢 FIX: UAT DEPLOYMENT now runs ONLY after a successful PUSH (i.e., a merge).
-  # It is now dependent on both the CI build and the Code Review stage.
   # ==========================================================
-  # 3. UAT DEPLOYMENT (Triggered by successful push/merge to develop)
+  # 3. UAT DEPLOYMENT
+  # 💡 FIX 2: Change needs to code-review.
   # ==========================================================
   uat:
-    # 🟢 CONDITION: Runs ONLY on PUSH events AND requires a successful CI build.
-    # We remove the dependency on 'code-review' here because the code review
-    # only runs on the PR branch, not the merge (push) to 'develop'.
-    # A successful push to 'develop' *is* the completion of the review cycle.
+    # 🟢 CRITICAL FIX: UAT now strictly requires code-review to complete.
+    needs: code-review
+    # Runs only on push events (i.e., when a PR is merged into develop).
     if: github.event_name == 'push' && success() && github.ref == 'refs/heads/develop'
-    needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
       stage: uat
@@ -75,7 +67,7 @@ jobs:
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
   # ==========================================================
-  # 4. PRODUCTION DEPLOYMENT (Placeholder - typically runs only from main)
+  # 4. PRODUCTION DEPLOYMENT (Placeholder)
   # ==========================================================
   production:
     if: always() && false
