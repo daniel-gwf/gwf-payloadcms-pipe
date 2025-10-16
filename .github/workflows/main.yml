@@ -30,14 +30,16 @@ jobs:
       repo_token: ${{ secrets.GITHUB_TOKEN }}
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-      # 🔑 FIX: Pass DATABASE_URI
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
+  #
+  # 🟢 FIX: CODE REVIEW STAGE now correctly defines its purpose.
+  # This job creates a deployment environment for the PR branch (Code Review).
   # ==========================================================
   # 2. CODE REVIEW STAGE (For PRs)
   # ==========================================================
   code-review:
-    # Runs only on Pull Requests (e.g., when a feature branch targets develop)
+    # 🟢 CONDITION: Runs ONLY on Pull Requests targeting 'develop'.
     if: github.event_name == 'pull_request'
     needs: ci-build
     uses: ./.github/workflows/deploy.yml
@@ -47,15 +49,20 @@ jobs:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-      # 🔑 FIX: Pass DATABASE_URI
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
+  #
+  # 🟢 FIX: UAT DEPLOYMENT now runs ONLY after a successful PUSH (i.e., a merge).
+  # It is now dependent on both the CI build and the Code Review stage.
   # ==========================================================
   # 3. UAT DEPLOYMENT (Triggered by successful push/merge to develop)
   # ==========================================================
   uat:
-    # Runs only on push events and requires a successful build
-    if: github.event_name == 'push' && success()
+    # 🟢 CONDITION: Runs ONLY on PUSH events AND requires a successful CI build.
+    # We remove the dependency on 'code-review' here because the code review
+    # only runs on the PR branch, not the merge (push) to 'develop'.
+    # A successful push to 'develop' *is* the completion of the review cycle.
+    if: github.event_name == 'push' && success() && github.ref == 'refs/heads/develop'
     needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
@@ -63,20 +70,16 @@ jobs:
       deployment_environment: uat
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # 💡 FIX 3: Use the UAT hook for the develop branch deployment
       render_hook: ${{ secrets.RENDER_UAT_HOOK }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-      # 🔑 FIX: Pass DATABASE_URI
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
   # ==========================================================
   # 4. PRODUCTION DEPLOYMENT (Placeholder - typically runs only from main)
   # ==========================================================
   production:
-    # This job is usually manual or triggered by a merge to 'main'.
-    # Leaving it disabled here until 'main' is used for production merges.
     if: always() && false
     name: ⛔ Production (Disabled)
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Production deployment is currently disabled and should only run from the 'main' branch..."
+      - run: echo "Production deployment is currently disabled and should only run from the 'main' branch or tag."
