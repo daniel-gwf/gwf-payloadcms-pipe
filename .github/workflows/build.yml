@@ -23,7 +23,7 @@ on:
         required: false
       PAYLOAD_SECRET:
         required: false
-      DB_URL:
+      DATABASE_URL:
         required: false
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
       # 💡 FIX: Map the incoming secret to the exact name Payload expects during build.
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       # 💡 FIX: Expose the DB URL
-      DATABASE_URL: ${{ secrets.DB_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       - name: Checkout code
