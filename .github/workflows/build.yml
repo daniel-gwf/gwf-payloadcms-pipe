@@ -37,8 +37,9 @@ jobs:
 
     env:
       RENDER_HOOK: ${{ secrets.render_hook }}
-      NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
-      PAYLOAD_SECRET_ENV: ${{ secrets.PAYLOAD_SECRET }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # 💡 FIX: Map the incoming secret to the application's expected name
+      SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
 
     steps:
       - name: Checkout code
