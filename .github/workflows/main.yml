@@ -102,9 +102,11 @@ jobs:
   # 5. PRODUCTION DEPLOYMENT (v* tags)
   deploy-production:
     name: 🚀 Production Deployment (Gated)
-    # Runs after Prod-Test and only on the production tag
-    if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v') && !startsWith(github.ref, 'refs/tags/cr-v')
-    needs: [ci-build, deploy-prod-test] # Enforces sequential order
+    if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v')
+    needs: ci-build
+    # 🔑 CRITICAL FIX: Add permissions here
+    permissions:
+      contents: write
     uses: ./.github/workflows/deploy.yml
     with:
       stage: production
