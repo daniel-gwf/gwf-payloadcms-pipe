@@ -4,10 +4,10 @@ name: 🚀 Fully Tag-Triggered CI/CD Pipeline
 on:
   push:
     tags:
-      # Tags used for deployment to specific environments
       - 'cr-v[0-9]+.[0-9]+.[0-9]+*'
       - 'uat-v[0-9]+.[0-9]+.[0-9]+*'
       - 'test-v[0-9]+.[0-9]+.[0-9]+'
+      - 'pt-v[0-9]+.[0-9]+.[0-9]+'  # ⬅️ ADD THIS LINE
       - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
@@ -79,23 +79,22 @@ jobs:
 
   # 4. PROD-TEST DEPLOYMENT (test-v* tags)
   deploy-prod-test:
-    name: 🧪 Prod-Test Deployment (Gated)
-    if: success() && startsWith(github.ref, 'refs/tags/test-v')
+    name: 🧪 Prod-Test Deployment
+    # This runs only when a tag starting with 'pt-v' is pushed
+    if: success() && startsWith(github.ref, 'refs/tags/pt-v')
     needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
       stage: prod-test
-      deployment_environment: prod-test
+      deployment_environment: prod-test # Use a specific environment for gating/protection rules
       tag: ${{ github.ref_name }}
       node-version: '20'
-      # 🔑 Accessing output correctly from the needs context:
       artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-      render_hook: ${{ secrets.RENDER_PROD_TEST_HOOK }} # Assumed secret name
+      render_hook: ${{ secrets.RENDER_PROD_TEST_HOOK }} # ⬅️ USES NEW SECRET
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-
   # 5. PRODUCTION DEPLOYMENT (v* tags)
   deploy-production:
     name: 🚀 Production Deployment (Gated)
