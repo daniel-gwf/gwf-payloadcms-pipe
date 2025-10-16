@@ -1,0 +1,49 @@
+# 1) Commit changes and push to default branch (develop)
+git checkout develop
+git pull origin develop
+git add .
+git commit -m "Add workflows and populateAuthors fix"
+git push origin develop
+
+# 2) Feature branch workflow (create, commit, push)
+git checkout -b feature/my-feature
+# make changes...
+git add .
+git commit -m "Work on feature"
+git push origin feature/my-feature
+
+# 3) Create & push UAT tag (annotated)
+git tag -a uat/2025-10-16 -m "UAT deploy for 2025-10-16"
+git push origin uat/2025-10-16
+
+# 4) Create & push Production tag (semantic version)
+git tag -a v1.2.3 -m "Release v1.2.3"
+git push origin v1.2.3
+
+# OR create & push Production tag (prod/*)
+git tag -a prod/2025-10-16 -m "Prod deploy 2025-10-16"
+git push origin prod/2025-10-16
+
+# 5) Tag a specific commit (use actual commit SHA)
+git tag -a prod/1.2.3 <COMMIT_SHA> -m "Prod deploy for commit <COMMIT_SHA>"
+git push origin prod/1.2.3
+
+# 6) Manually trigger workflow via GitHub CLI (workflow_dispatch)
+gh workflow run "CI + Tag-based Deployments" --ref develop
+# or by filename
+gh workflow run main.yml --ref develop
+
+# 7) Inspect runs with GitHub CLI
+gh run list
+gh run view <run-id> --log
+
+# 8) Re-run or re-deploy a tag (delete remote tag and re-push)
+git push --delete origin prod/2025-10-16
+git tag -f prod/2025-10-16
+git push origin prod/2025-10-16
+
+# Notes:
+# - Replace placeholder values (dates, versions, <COMMIT_SHA>, branch names) before running.
+# - Use annotated tags (-a) as recommended.
+# - Ensure workflows are committed to the default branch (develop) and Actions are enabled.
+# - If using gh CLI, authenticate first: gh auth login
