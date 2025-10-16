@@ -45,7 +45,7 @@ jobs:
       # 🔑 FIX 2: Expose DATABASE_URI
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
       # 🟢 CRITICAL FIX: Explicitly set the flag for the CI build environment
-      CI_BUILD: 'true'
+      #CI_BUILD: 'true'
 
     steps:
       - name: Checkout code
