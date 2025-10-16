@@ -30,6 +30,26 @@ jobs:
         run: |
           mkdir -p build_output
           echo "Simulated build for tag ${{ github.ref_name }}" > build_output/app.txt
+
+      # Trigger Render.com Code Review/Development Build
+      - name: Trigger Render.com Code Review Build (RENDER_CR_HOOK)
+        run: |
+          # The curl command triggers the Render webhook, passing necessary secrets.
+          # Note: Secrets are passed as query parameters or in the body depending on the hook configuration.
+          # This example uses a JSON body that includes the tag and deployment secrets.
+          # Render typically reads configuration from the repo, but some services require these inline.
+          curl -X POST -H "Content-Type: application/json" \
+            -d "{
+              \"tag\": \"${{ github.ref_name }}\",
+              \"PAYLOAD_SECRET\": \"${{ secrets.PAYLOAD_SECRET }}\",
+              \"DATABASE_URI\": \"${{ secrets.DATABASE_URI }}\"
+            }" \
+            "${{ secrets.RENDER_CR_HOOK }}"
+        env:
+          RENDER_CR_HOOK: ${{ secrets.RENDER_CR_HOOK }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+
       # Save the artifact so downstream jobs can deploy the *same* binary
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -49,9 +69,24 @@ jobs:
         with:
           name: deployment-artifact-${{ github.ref_name }}
           path: ./downloaded-artifact
-      - name: Deploy to UAT Environment
-        # Explicitly referencing the tag in the deployment log
-        run: echo "Deploying approved artifact from tag ${{ github.ref_name }} to UAT."
+
+      # Trigger Render.com UAT Build
+      - name: Trigger Render.com UAT Build (RENDER_UAT_HOOK)
+        run: |
+          echo "Deploying approved artifact from tag ${{ github.ref_name }} to UAT."
+          # The curl command triggers the Render webhook, passing necessary secrets.
+          curl -X POST -H "Content-Type: application/json" \
+            -d "{
+              \"tag\": \"${{ github.ref_name }}\",
+              \"PAYLOAD_SECRET\": \"${{ secrets.PAYLOAD_SECRET }}\",
+              \"DATABASE_URI\": \"${{ secrets.DATABASE_URI }}\"
+            }" \
+            "${{ secrets.RENDER_UAT_HOOK }}"
+        env:
+          RENDER_UAT_HOOK: ${{ secrets.RENDER_UAT_HOOK }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+
       - name: Run UAT Smoke Tests
         run: echo "UAT tests complete. Environment verified for tag ${{ github.ref_name }}."
 
@@ -67,9 +102,24 @@ jobs:
         with:
           name: deployment-artifact-${{ github.ref_name }}
           path: ./downloaded-artifact
-      - name: Deploy to Production Test Environment
-        # Explicitly referencing the tag in the deployment log
-        run: echo "Deploying APPROVED artifact from UAT to Prod-Test for tag ${{ github.ref_name }}."
+
+      # Trigger Render.com Prod-Test Build
+      - name: Trigger Render.com Prod-Test Build (RENDER_PROD_TEST_HOOK)
+        run: |
+          echo "Deploying APPROVED artifact from UAT to Prod-Test for tag ${{ github.ref_name }}."
+          # The curl command triggers the Render webhook, passing necessary secrets.
+          curl -X POST -H "Content-Type: application/json" \
+            -d "{
+              \"tag\": \"${{ github.ref_name }}\",
+              \"PAYLOAD_SECRET\": \"${{ secrets.PAYLOAD_SECRET }}\",
+              \"DATABASE_URI\": \"${{ secrets.DATABASE_URI }}\"
+            }" \
+            "${{ secrets.RENDER_PROD_TEST_HOOK }}"
+        env:
+          RENDER_PROD_TEST_HOOK: ${{ secrets.RENDER_PROD_TEST_HOOK }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+
       - name: Run End-to-End Production Tests
         run: echo "Prod-test E2E complete. Artifacts are ready for production for tag ${{ github.ref_name }}."
 
@@ -86,8 +136,23 @@ jobs:
         with:
           name: deployment-artifact-${{ github.ref_name }}
           path: ./downloaded-artifact
-      - name: Deploy to Final Production
-        # Explicitly referencing the tag in the deployment log
-        run: echo "Deploying APPROVED artifact from Prod-Test to PRODUCTION for tag ${{ github.ref_name }}."
+
+      - name: Trigger Render.com Production Build (RENDER_PROD_HOOK)
+        # This step calls the Render Webhook to start a new build/deployment.
+        run: |
+          echo "Deploying APPROVED artifact from Prod-Test to PRODUCTION for tag ${{ github.ref_name }}."
+          # Use curl to send a POST request to the Render deploy hook, passing secrets in the body.
+          curl -X POST -H "Content-Type: application/json" \
+            -d "{
+              \"tag\": \"${{ github.ref_name }}\",
+              \"PAYLOAD_SECRET\": \"${{ secrets.PAYLOAD_SECRET }}\",
+              \"DATABASE_URI\": \"${{ secrets.DATABASE_URI }}\"
+            }" \
+            "${{ secrets.RENDER_PROD_HOOK }}"
+        env:
+          RENDER_PROD_HOOK: ${{ secrets.RENDER_PROD_HOOK }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+
       - name: Final Health Check
-        run: echo "Production health checks passed for tag ${{ github.ref_name }}."
+        run: echo "Production build triggered for tag ${{ github.ref_name }} on Render.com."
