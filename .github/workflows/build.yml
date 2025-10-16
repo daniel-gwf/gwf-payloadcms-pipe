@@ -23,6 +23,8 @@ on:
         required: false
       PAYLOAD_SECRET:
         required: false
+      DB_URL:
+        required: false
 
 jobs:
   build:
@@ -41,6 +43,8 @@ jobs:
       NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
       # 💡 FIX: Map the incoming secret to the exact name Payload expects during build.
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      # 💡 FIX: Expose the DB URL
+      DATABASE_URL: ${{ secrets.DB_URL }}
 
     steps:
       - name: Checkout code

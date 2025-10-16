@@ -30,6 +30,7 @@ jobs:
       repo_token: ${{ secrets.GITHUB_TOKEN }}
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      DATABASE_URL: ${{ secrets.DB_URL }}
 
   # ==========================================================
   # 2. CODE REVIEW STAGE (For PRs)
@@ -45,6 +46,7 @@ jobs:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      DATABASE_URL: ${{ secrets.DB_URL }}
 
   # ==========================================================
   # 3. UAT DEPLOYMENT (Triggered by successful push/merge to develop)
@@ -62,6 +64,7 @@ jobs:
       # 💡 FIX 3: Use the UAT hook for the develop branch deployment
       render_hook: ${{ secrets.RENDER_UAT_HOOK }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      DATABASE_URL: ${{ secrets.DB_URL }}
 
   # ==========================================================
   # 4. PRODUCTION DEPLOYMENT (Placeholder - typically runs only from main)
