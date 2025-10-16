@@ -45,6 +45,8 @@ jobs:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       # 💡 FIX: Expose the DB URL
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # 💡 FIX: Explicitly set a flag for the CI build environment
+      CI_BUILD: 'true'
 
     steps:
       - name: Checkout code
