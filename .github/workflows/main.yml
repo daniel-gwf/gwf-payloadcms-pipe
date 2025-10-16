@@ -63,6 +63,9 @@ jobs:
     name: Deploy → UAT (tags)
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/uat/') || startsWith(github.ref, 'refs/tags/deploy/uat/')
+    env:
+      NODE_VERSION: ${{ env.NODE_VERSION }}
+      RENDER_UAT_HOOK: ${{ secrets.RENDER_UAT_HOOK }}
     steps:
       - name: Checkout tagged commit
         uses: actions/checkout@v4
@@ -91,15 +94,18 @@ jobs:
           zip -r build-output/build-uat-${{ github.sha }}.zip build dist || true
 
       - name: Trigger Render UAT (if hook present)
-        if: ${{ secrets.RENDER_UAT_HOOK != '' }}
+        if: ${{ env.RENDER_UAT_HOOK != '' }}
         run: |
           echo "Triggering Render UAT for tag=${{ github.ref_name }}"
-          curl -X POST -sSf -H "Content-Type: application/json" "${{ secrets.RENDER_UAT_HOOK }}" -d '{}'
+          curl -X POST -sSf -H "Content-Type: application/json" "$RENDER_UAT_HOOK" -d '{}'
 
   deploy_production:
     name: Deploy → Production (tags)
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/prod/') || startsWith(github.ref, 'refs/tags/deploy/') || startsWith(github.ref, 'refs/tags/v')
+    env:
+      NODE_VERSION: ${{ env.NODE_VERSION }}
+      RENDER_PROD_HOOK: ${{ secrets.RENDER_PROD_HOOK }}
     steps:
       - name: Checkout tagged commit
         uses: actions/checkout@v4
@@ -128,7 +134,7 @@ jobs:
           zip -r build-output/build-production-${{ github.sha }}.zip build dist || true
 
       - name: Trigger Render Production (if hook present)
-        if: ${{ secrets.RENDER_PROD_HOOK != '' }}
+        if: ${{ env.RENDER_PROD_HOOK != '' }}
         run: |
           echo "Triggering Render Production for tag=${{ github.ref_name }}"
-          curl -X POST -sSf -H "Content-Type: application/json" "${{ secrets.RENDER_PROD_HOOK }}" -d '{}'
+          curl -X POST -sSf -H "Content-Type: application/json" "$RENDER_PROD_HOOK" -d '{}'
