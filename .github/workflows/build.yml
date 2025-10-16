@@ -1,4 +1,4 @@
-name: Reusable Build Workflow
+name: Build Workflow (Reusable)
 
 on:
   workflow_call:
@@ -13,6 +13,15 @@ on:
       deployment_environment:
         required: false
         type: string
+    secrets:
+      repo_token:
+        required: true
+      NPM_TOKEN:
+        required: false
+      render_hook:
+        required: false
+      PAYLOAD_SECRET:
+        required: false
 
 jobs:
   build:
@@ -26,7 +35,9 @@ jobs:
       artifact-name: ${{ steps.set-artifact.outputs.artifact }}
 
     env:
-      NODE_ENV: production
+      RENDER_HOOK: ${{ secrets.render_hook }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
     steps:
       - name: Checkout code
@@ -38,11 +49,16 @@ jobs:
           node-version: ${{ inputs.node-version }}
           cache: "npm"
 
+      - name: Authenticate npm (optional)
+        run: |
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          else
+            echo "No NPM_TOKEN provided — skipping npm authentication"
+          fi
+
       - name: Install dependencies
         run: npm ci
-
-      - name: Run lint
-        run: npm run lint || true
 
       - name: Run build
         run: npm run build
@@ -50,14 +66,20 @@ jobs:
       - name: Package build output
         run: |
           mkdir -p build-output
-          zip -r build-output/build-${{ inputs.stage }}-${{ github.sha }}.zip build dist || true
+          zip -r build-output/build-${{ inputs.stage }}.zip build dist || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ inputs.stage }}-${{ github.sha }}
+          name: build-${{ inputs.stage }}
           path: build-output/
-          retention-days: 7
+          retention-days: 3
 
       - id: set-artifact
-        run: echo "artifact=build-${{ inputs.stage }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "artifact=build-${{ inputs.stage }}" >> $GITHUB_OUTPUT
+
+      - name: Trigger Render (UAT/Production only)
+        if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
+        run: |
+          echo "Triggering Render for stage=${{ inputs.stage }}"
+          curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'

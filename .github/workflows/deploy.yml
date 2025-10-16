@@ -16,6 +16,13 @@ on:
       tag:
         required: false
         type: string
+    secrets:
+      PAYLOAD_SECRET:
+        required: false
+      render_hook:
+        required: false
+      NPM_TOKEN:
+        required: false
 
 jobs:
   deploy:
@@ -28,13 +35,15 @@ jobs:
     env:
       NODE_ENV: production
       DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      RENDER_HOOK: ${{ secrets.render_hook }}
 
     steps:
       - name: Checkout tagged commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ env.DEPLOY_TAG }}
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

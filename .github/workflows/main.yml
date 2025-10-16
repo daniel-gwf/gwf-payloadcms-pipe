@@ -1,140 +1,44 @@
-name: CI + Tag-based Deployments
+name: CI → Code-Review → UAT → Production
 
 on:
   push:
     branches:
-      - develop
-      - 'feature/**'
-      - 'bugfix/**'
-      - 'hotfix/**'
-    tags:
-      - 'uat/**'
-      - 'prod/**'
-      - 'deploy/**'
-      - 'v*'
+      - main
   pull_request:
     branches:
-      - develop
-  workflow_dispatch:
+      - main
 
 permissions:
   contents: read
 
-env:
-  NODE_VERSION: "20"
-
 jobs:
-  ci_build:
-    name: CI Build (branches)
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/heads/')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  code-review:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      stage: code-review
+      deployment_environment: code-review
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
+  uat:
+    needs: code-review
+    uses: ./.github/workflows/deploy.yml
+    with:
+      stage: uat
+      deployment_environment: uat
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      render_hook: ${{ secrets.RENDER_UAT_HOOK }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run lint
-        run: npm run lint || true
-
-      - name: Run build
-        run: npm run build
-
-      - name: Package build output
-        run: |
-          mkdir -p build-output
-          zip -r build-output/build-code-review-${{ github.sha }}.zip build dist || true
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-code-review-${{ github.sha }}
-          path: build-output/
-          retention-days: 7
-
-  deploy_uat:
-    name: Deploy → UAT (tags)
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/uat/') || startsWith(github.ref, 'refs/tags/deploy/uat/')
-    steps:
-      - name: Checkout tagged commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run lint
-        run: npm run lint || true
-
-      - name: Run build
-        run: npm run build
-
-      - name: Package build output
-        run: |
-          mkdir -p build-output
-          zip -r build-output/build-uat-${{ github.sha }}.zip build dist || true
-
-      - name: Trigger Render UAT (if hook present)
-        run: |
-          if [ -n "${{ secrets.RENDER_UAT_HOOK }}" ]; then
-            echo "Triggering Render UAT for tag=${{ github.ref_name }}"
-            curl -X POST -sSf -H "Content-Type: application/json" "${{ secrets.RENDER_UAT_HOOK }}" -d '{}'
-          else
-            echo "No RENDER_UAT_HOOK configured; skipping"
-          fi
-
-  deploy_production:
-    name: Deploy → Production (tags)
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/prod/') || startsWith(github.ref, 'refs/tags/deploy/') || startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Checkout tagged commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run lint
-        run: npm run lint || true
-
-      - name: Run build
-        run: npm run build
-
-      - name: Package build output
-        run: |
-          mkdir -p build-output
-          zip -r build-output/build-production-${{ github.sha }}.zip build dist || true
-
-      - name: Trigger Render Production (if hook present)
-        run: |
-          if [ -n "${{ secrets.RENDER_PROD_HOOK }}" ]; then
-            echo "Triggering Render Production for tag=${{ github.ref_name }}"
-            curl -X POST -sSf -H "Content-Type: application/json" "${{ secrets.RENDER_PROD_HOOK }}" -d '{}'
-          else
-            echo "No RENDER_PROD_HOOK configured; skipping"
-          fi
+  production:
+    needs: uat
+    uses: ./.github/workflows/deploy.yml
+    with:
+      stage: production
+      deployment_environment: production
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      render_hook: ${{ secrets.RENDER_PROD_HOOK }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
