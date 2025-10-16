@@ -121,8 +121,30 @@ jobs:
   # 6. CREATE GITHUB RELEASE (Runs after Production deployment)
   create-release:
     name: 📝 Create GitHub Release
+    # This condition ensures it only runs on the final production tag (e.g., v1.0.0)
     if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v') && !startsWith(github.ref, 'refs/tags/cr-v')
-    needs: deploy-production # Enforces sequential order
-    uses: ./.github/workflows/release.yml
-    # The release.yml workflow needs to be updated to accept inputs if required.
-    # Assuming it uses global secrets and github.ref.
+    needs: deploy-production # Must run after the production deployment job finishes
+    runs-on: ubuntu-latest
+    permissions:
+      # CRITICAL: This permission is required to create a GitHub Release
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Checkout the specific tag that triggered the workflow
+          ref: ${{ github.ref }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          # GITHUB_TOKEN is available automatically
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            Automatic GitHub Release for tag **${{ github.ref_name }}**.
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
