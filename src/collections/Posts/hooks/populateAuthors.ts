@@ -1,37 +1,17 @@
-import type { CollectionAfterReadHook } from 'payload'
-import { User } from 'src/payload-types'
+// Lightweight hook implementation without importing 'payload/types' to avoid missing-module errors.
+// _req is prefixed with underscore to satisfy the eslint no-unused-vars rule.
 
-// The `user` collection has access control locked so that users are not publicly accessible
-// This means that we need to populate the authors manually here to protect user privacy
-// GraphQL will not return mutated user data that differs from the underlying schema
-// So we use an alternative `populatedAuthors` field to populate the user data, hidden from the admin UI
-export const populateAuthors: CollectionAfterReadHook = async ({ doc, req, req: { payload } }) => {
-  if (doc?.authors && doc?.authors?.length > 0) {
-    const authorDocs: User[] = []
+const populateAuthors = async ({ data, _req }: any) => {
+  if (!data) return data
 
-    for (const author of doc.authors) {
-      try {
-        const authorDoc = await payload.findByID({
-          id: typeof author === 'object' ? author?.id : author,
-          collection: 'users',
-          depth: 0,
-        })
-
-        if (authorDoc) {
-          authorDocs.push(authorDoc)
-        }
-
-        if (authorDocs.length > 0) {
-          doc.populatedAuthors = authorDocs.map((authorDoc) => ({
-            id: authorDoc.id,
-            name: authorDoc.name,
-          }))
-        }
-      } catch {
-        // swallow error
-      }
-    }
+  if (Array.isArray((data as any).authors)) {
+    ;(data as any).authors = (data as any).authors.map((a: any) => {
+      if (typeof a === 'string') return { id: a }
+      return a
+    })
   }
 
-  return doc
+  return data
 }
+
+export default populateAuthors

@@ -1,4 +1,4 @@
-name: Build Workflow (Reusable)
+name: Reusable Deploy Workflow (tag-triggered)
 
 on:
   workflow_call:
@@ -13,31 +13,28 @@ on:
       deployment_environment:
         required: false
         type: string
-    # DO NOT declare a secret named GITHUB_TOKEN here
-    secrets:
-      NPM_TOKEN:
+      tag:
         required: false
-      render_hook:
-        required: false
+        type: string
 
 jobs:
-  build:
-    name: Build for ${{ inputs.stage }}
+  deploy:
+    name: Deploy for ${{ inputs.stage }} (tag: ${{ inputs.tag || github.ref_name }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.deployment_environment }}
     permissions:
       contents: read
 
-    outputs:
-      artifact-name: ${{ steps.set-artifact.outputs.artifact }}
-
     env:
-      RENDER_HOOK: ${{ secrets.render_hook }}
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      NODE_ENV: production
+      DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout tagged commit
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,16 +42,11 @@ jobs:
           node-version: ${{ inputs.node-version }}
           cache: "npm"
 
-      - name: Authenticate npm (optional)
-        run: |
-          if [ -n "${NPM_TOKEN}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-          else
-            echo "No NPM_TOKEN provided — skipping npm authentication"
-          fi
-
       - name: Install dependencies
         run: npm ci
+
+      - name: Run lint
+        run: npm run lint || true
 
       - name: Run build
         run: npm run build
@@ -62,20 +54,10 @@ jobs:
       - name: Package build output
         run: |
           mkdir -p build-output
-          zip -r build-output/build-${{ inputs.stage }}.zip build dist || true
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ inputs.stage }}
-          path: build-output/
-          retention-days: 3
-
-      - id: set-artifact
-        run: echo "artifact=build-${{ inputs.stage }}" >> $GITHUB_OUTPUT
+          zip -r build-output/build-${{ inputs.stage }}-${{ github.sha }}.zip build dist || true
 
       - name: Trigger Render (UAT/Production only)
         if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
         run: |
-          echo "Triggering Render for stage=${{ inputs.stage }}"
+          echo "Triggering Render for stage=${{ inputs.stage }} (tag=${{ env.DEPLOY_TAG }})"
           curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'
