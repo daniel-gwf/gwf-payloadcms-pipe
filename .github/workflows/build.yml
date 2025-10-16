@@ -23,7 +23,7 @@ on:
         required: false
       PAYLOAD_SECRET:
         required: false
-      DATABASE_URL:
+      DATABASE_URI:
         required: false
 
 jobs:
@@ -36,17 +36,13 @@ jobs:
 
     outputs:
       artifact-name: ${{ steps.set-artifact.outputs.artifact }}
-
     env:
       RENDER_HOOK: ${{ secrets.render_hook }}
-      # Retaining old name for consistency if used elsewhere:
       NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
-      # 💡 FIX: Map the incoming secret to the exact name Payload expects during build.
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-      # 💡 FIX: Expose the DB URL
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      # 💡 FIX: Explicitly set a flag for the CI build environment
-      CI_BUILD: 'true'
+      DATABASE_URI: ${{ secrets.DATABASE_URI }}
+      # 💡 FIX: Add flag to skip DB connection
+      #CI_BUILD: 'true'
 
     steps:
       - name: Checkout code
