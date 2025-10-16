@@ -3,10 +3,11 @@ name: CI → Code-Review → UAT → Production
 on:
   push:
     branches:
-      - main
+      - develop
   pull_request:
     branches:
-      - main
+      - develop
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,6 +30,7 @@ jobs:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       render_hook: ${{ secrets.RENDER_UAT_HOOK }}
+
 
   production:
     needs: uat
