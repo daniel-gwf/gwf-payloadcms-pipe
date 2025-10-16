@@ -20,6 +20,13 @@ import { getServerSideURL } from './utilities/getURL'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+// 🔑 DEFINITIVE FIX: Define the connection string based on the CI_BUILD flag.
+// If CI_BUILD is true, we use a non-connective, but valid URI to bypass connection during static build.
+const connectionString =
+  process.env.CI_BUILD === 'true'
+    ? 'postgresql://placeholder:placeholder@localhost/placeholder?sslmode=disable' // Safe placeholder URI
+    : process.env.DATABASE_URI // Use your actual URI if not in CI build
+
 export default buildConfig({
   admin: {
     components: {
@@ -60,14 +67,11 @@ export default buildConfig({
   // This config helps us configure global or default features that the other editors can inherit
   editor: defaultLexical,
 
-  // 🔑 CRITICAL FIX: Ensure the connection string is never an empty string ('') during build.
+  // 🟢 APPLY THE CORRECTED CONNECTION STRING LOGIC
   db: postgresAdapter({
     pool: {
-      // 🟢 FIX: If DATABASE_URI is missing, use a safe, well-formed, but unreachable URI.
-      // This satisfies the adapter's need for a string without crashing the build on localhost.
-      connectionString:
-        process.env.DATABASE_URI ||
-        'postgresql://user:password@non-connecting-host:5432/placeholder',
+      // Use the conditionally defined connectionString here
+      connectionString: connectionString || '', // Fall back to empty string if somehow both are missing
     },
   }),
 

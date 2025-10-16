@@ -44,7 +44,8 @@ jobs:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       # 🔑 FIX: Expose DATABASE_URI as an environment variable
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # The CI_BUILD flag is commented out/removed to force a database connection
+      # 🟢 ADD THIS LINE: Explicitly set the flag for the CI build environment
+      CI_BUILD: 'true'
 
     steps:
       - name: Checkout code
