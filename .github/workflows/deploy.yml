@@ -37,7 +37,7 @@ jobs:
       NODE_ENV: production
       DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
       RENDER_HOOK: ${{ secrets.render_hook }}
-      SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
 
       # ... (rest of your build steps)

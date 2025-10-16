@@ -37,9 +37,10 @@ jobs:
 
     env:
       RENDER_HOOK: ${{ secrets.render_hook }}
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # 💡 FIX: Map the incoming secret to the application's expected name
-      SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
+      # Retaining old name for consistency if used elsewhere:
+      NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
+      # 💡 FIX: Map the incoming secret to the exact name Payload expects during build.
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
     steps:
       - name: Checkout code
@@ -63,6 +64,7 @@ jobs:
         run: npm ci
 
       - name: Run build
+        # The build command now has SECRET_KEY available in its environment
         run: npm run build
 
       - name: Package build output
@@ -75,7 +77,7 @@ jobs:
         with:
           name: build-${{ inputs.stage }}
           path: build-output/
-          retention-days: 3
+          retention-days: 7
 
       - id: set-artifact
         run: echo "artifact=build-${{ inputs.stage }}" >> $GITHUB_OUTPUT
