@@ -1,4 +1,4 @@
-# .github/workflows/build.yml
+# .github/workflows/build.yml (Full File)
 name: Build Workflow (Reusable)
 
 on:
@@ -23,7 +23,7 @@ on:
         required: false
       PAYLOAD_SECRET:
         required: false
-      # 🔑 FIX: Accept DATABASE_URI as an input secret
+      # 🔑 FIX 1: Accept DATABASE_URI secret
       DATABASE_URI:
         required: false
 
@@ -42,9 +42,9 @@ jobs:
       RENDER_HOOK: ${{ secrets.render_hook }}
       NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-      # 🔑 FIX: Expose DATABASE_URI as an environment variable
+      # 🔑 FIX 2: Expose DATABASE_URI
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # 🟢 ADD THIS LINE: Explicitly set the flag for the CI build environment
+      # 🟢 CRITICAL FIX: Explicitly set the flag for the CI build environment
       CI_BUILD: 'true'
 
     steps:
@@ -69,7 +69,7 @@ jobs:
         run: npm ci
 
       - name: Run build
-        # This step will now attempt to connect using the DATABASE_URI env var
+        # This will now use the CI_BUILD flag in payload.config.ts and skip connecting to the database.
         run: npm run build
 
       - name: Package build output
@@ -91,4 +91,6 @@ jobs:
         if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
         run: |
           echo "Triggering Render for stage=${{ inputs.stage }}"
-          curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'
+          curl -s -X POST "${{ env.RENDER_HOOK }}" \
+            -H "Accept: application/json" \
+            -w "\nHTTP %{http_code}\n"

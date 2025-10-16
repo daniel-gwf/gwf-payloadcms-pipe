@@ -20,8 +20,9 @@ import { getServerSideURL } from './utilities/getURL'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// 🔑 DEFINITIVE FIX: Define the connection string based on the CI_BUILD flag.
+// 🟢 FIX: Define the connection string based on the CI_BUILD flag.
 // If CI_BUILD is true, we use a non-connective, but valid URI to bypass connection during static build.
+// Otherwise, it uses your provided DATABASE_URI.
 const connectionString =
   process.env.CI_BUILD === 'true'
     ? 'postgresql://placeholder:placeholder@localhost/placeholder?sslmode=disable' // Safe placeholder URI
@@ -71,7 +72,7 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       // Use the conditionally defined connectionString here
-      connectionString: connectionString || '', // Fall back to empty string if somehow both are missing
+      connectionString: connectionString || '', // Fall back to empty string if both are missing
     },
   }),
 
