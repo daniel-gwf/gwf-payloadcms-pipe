@@ -38,9 +38,8 @@ jobs:
       DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
       RENDER_HOOK: ${{ secrets.render_hook }}
       SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
-      RENDER_HOOK: ${{ secrets.render_hook }}
 
-    steps:
+
       # ... (rest of your build steps)
     steps:
       - name: Checkout Code (Needed for Render deploy hook)
