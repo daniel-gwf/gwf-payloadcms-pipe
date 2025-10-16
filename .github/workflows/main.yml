@@ -3,7 +3,7 @@ name: Full CD Pipeline (Review -> UAT -> Prod -> Release)
 on:
   push:
     branches:
-      - main
+      - develop # CHANGED: Workflow will now trigger on pushes to the 'develop' branch
   workflow_dispatch: # Allows manual trigger for testing
 
 # CRITICAL FIX: Set permissions at the workflow level to ensure the GITHUB_TOKEN has write
