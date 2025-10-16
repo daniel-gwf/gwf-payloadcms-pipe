@@ -1,52 +1,82 @@
-# .github/workflows/build.yml
-name: Reusable Build & CI
+name: Build Workflow (Reusable)
 
 on:
-  # Allows this workflow to be called from other workflows
   workflow_call:
     inputs:
-      node_version:
+      node-version:
+        required: false
+        type: string
+        default: "20"
+      stage:
         required: true
         type: string
-        default: '18'
-      ref:
-        required: true
+      deployment_environment:
+        required: false
         type: string
-    outputs:
-      release_version:
-        description: "The version used for deployment (from the Git reference name)"
-        value: ${{ jobs.build_and_lint.outputs.release_version }}
+    secrets:
+      repo_token:
+        required: true
+      NPM_TOKEN:
+        required: false
+      render_hook:
+        required: false
 
 jobs:
-  build_and_lint:
-    name: 🧪 Build & Lint
+  build:
+    name: Build for ${{ inputs.stage }}
     runs-on: ubuntu-latest
+    environment: ${{ inputs.deployment_environment }}
+    permissions:
+      contents: read
+
     outputs:
-      release_version: ${{ steps.set_version.outputs.version }}
+      artifact-name: ${{ steps.set-artifact.outputs.artifact }}
+
+    env:
+      RENDER_HOOK: ${{ secrets.render_hook }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }} # Use the reference passed from the caller
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node_version }}
-          cache: 'npm'
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
 
-      - name: Install Dependencies & PNPM
+      - name: Authenticate npm (optional)
         run: |
-          npm install -g pnpm
-          npm ci
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          else
+            echo "No NPM_TOKEN provided — skipping npm authentication"
+          fi
 
-      - name: Run Linting
-        run: npm run lint
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build Application
-        run: echo "Code built successfully."
+      - name: Run build
+        run: npm run build
 
-      - name: Set Release Version Output
-        id: set_version
-        run: echo "version=$(echo ${{ inputs.ref }} | sed 's/refs\/\(heads\|tags\)\///')" >> $GITHUB_OUTPUT # Extracts branch or tag name
+      - name: Package build output
+        run: |
+          mkdir -p build-output
+          zip -r build-output/build-${{ inputs.stage }}.zip build dist || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ inputs.stage }}
+          path: build-output/
+          retention-days: 3
+
+      - id: set-artifact
+        run: echo "artifact=build-${{ inputs.stage }}" >> $GITHUB_OUTPUT
+
+      - name: Trigger Render (UAT/Production only)
+        if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
+        run: |
+          echo "Triggering Render for stage=${{ inputs.stage }}"
+          curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'
