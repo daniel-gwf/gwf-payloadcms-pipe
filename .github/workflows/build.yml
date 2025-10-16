@@ -23,7 +23,7 @@ on:
         required: false
       PAYLOAD_SECRET:
         required: false
-      # 🔑 FIX: Declare DATABASE_URI as an input secret
+      # 🔑 FIX: Accept DATABASE_URI as an input secret
       DATABASE_URI:
         required: false
 
@@ -44,7 +44,7 @@ jobs:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       # 🔑 FIX: Expose DATABASE_URI as an environment variable
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # Removed CI_BUILD to force database connection
+      # The CI_BUILD flag is commented out/removed to force a database connection
 
     steps:
       - name: Checkout code

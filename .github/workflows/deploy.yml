@@ -24,7 +24,7 @@ on:
         required: false
       NPM_TOKEN:
         required: false
-      # 🔑 FIX: Declare DATABASE_URI as an input secret
+      # 🔑 FIX: Accept DATABASE_URI as an input secret
       DATABASE_URI:
         required: false
 
@@ -35,14 +35,15 @@ jobs:
     environment: ${{ inputs.deployment_environment }}
     permissions:
       contents: read
+
     env:
       NODE_ENV: production
-      DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}\
+      DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
       RENDER_HOOK: ${{ secrets.render_hook }}
       SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
       # 🔑 FIX: Expose DATABASE_URI as an environment variable
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # Removed CI_BUILD to allow database connection
+      # The CI_BUILD flag is commented out/removed to force a database connection
 
     steps:
       - name: Checkout Code (Needed for Render deploy hook)
@@ -50,6 +51,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
+
 
       # Trigger Render Deploy Hook...
       - name: Trigger Render Deploy Hook
