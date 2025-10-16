@@ -24,7 +24,7 @@ on:
         required: false
       NPM_TOKEN:
         required: false
-      # 💡 FIX 1: Add DATABASE_URL to the list of accepted secrets
+      # 🔑 FIX: Declare DATABASE_URI as an input secret
       DATABASE_URI:
         required: false
 
@@ -37,15 +37,13 @@ jobs:
       contents: read
     env:
       NODE_ENV: production
-      DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
+      DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}\
       RENDER_HOOK: ${{ secrets.render_hook }}
-      # Retaining SECRET_KEY name based on your file's history
       SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
+      # 🔑 FIX: Expose DATABASE_URI as an environment variable
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # 💡 FIX: Add flag to skip DB connection
-      # CI_BUILD: 'true'
+      # Removed CI_BUILD to allow database connection
 
-      # ... (rest of your build steps)
     steps:
       - name: Checkout Code (Needed for Render deploy hook)
         uses: actions/checkout@v4
@@ -53,13 +51,9 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
 
-      # 💡 FIX 1: Removed redundant Setup Node.js, npm ci, npm run build steps.
-      # The app is built in the ci-build job.
-
+      # Trigger Render Deploy Hook...
       - name: Trigger Render Deploy Hook
         if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
         run: |
           echo "Triggering Render for stage=${{ inputs.stage }}..."
-          # Render will check out the latest commit on the associated branch (e.g., 'develop')
-          # and then rebuild the service using its internal CI process.
           curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'

@@ -23,6 +23,7 @@ on:
         required: false
       PAYLOAD_SECRET:
         required: false
+      # 🔑 FIX: Declare DATABASE_URI as an input secret
       DATABASE_URI:
         required: false
 
@@ -36,13 +37,14 @@ jobs:
 
     outputs:
       artifact-name: ${{ steps.set-artifact.outputs.artifact }}
+
     env:
       RENDER_HOOK: ${{ secrets.render_hook }}
       NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      # 🔑 FIX: Expose DATABASE_URI as an environment variable
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # 💡 FIX: Add flag to skip DB connection
-      #CI_BUILD: 'true'
+      # Removed CI_BUILD to force database connection
 
     steps:
       - name: Checkout code
@@ -66,7 +68,7 @@ jobs:
         run: npm ci
 
       - name: Run build
-        # The build command now has SECRET_KEY available in its environment
+        # This step will now attempt to connect using the DATABASE_URI env var
         run: npm run build
 
       - name: Package build output

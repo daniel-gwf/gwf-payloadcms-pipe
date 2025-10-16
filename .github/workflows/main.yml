@@ -3,11 +3,11 @@ name: CI → Code-Review → UAT → Production
 
 on:
   push:
-    # 💡 FIX 1: Trigger pipeline on push to the develop branch
+    # 💡 Trigger pipeline on push to the develop branch
     branches:
       - develop
   pull_request:
-    # 💡 FIX 2: Trigger pipeline on PRs targeting the develop branch
+    # 💡 Trigger pipeline on PRs targeting the develop branch
     branches:
       - develop
 
@@ -30,6 +30,7 @@ jobs:
       repo_token: ${{ secrets.GITHUB_TOKEN }}
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      # 🔑 FIX: Pass the DATABASE_URI secret
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
   # ==========================================================
@@ -46,6 +47,7 @@ jobs:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      # 🔑 FIX: Pass the DATABASE_URI secret
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
   # ==========================================================
@@ -61,9 +63,10 @@ jobs:
       deployment_environment: uat
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # 💡 FIX 3: Use the UAT hook for the develop branch deployment
+      # 💡 Use the UAT hook for the develop branch deployment
       render_hook: ${{ secrets.RENDER_UAT_HOOK }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      # 🔑 FIX: Pass the DATABASE_URI secret
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
   # ==========================================================
@@ -76,4 +79,4 @@ jobs:
     name: ⛔ Production (Disabled)
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Production deployment is currently disabled and should only run from the 'main' branch."
+      - run: echo "Production deployment is currently disabled and should only run from the 'main' branch or a tag push."
