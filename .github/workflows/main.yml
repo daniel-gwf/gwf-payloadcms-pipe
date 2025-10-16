@@ -22,15 +22,15 @@ jobs:
     name: 🏗️ CI Build for ${{ github.ref_name }}
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/build.yml
-    # 💥 FIX: Removed the 'outputs' property here. It is NOT allowed on jobs that use 'uses:'.
-    # The output from the reusable workflow is still available via 'needs.ci-build.outputs.<output-name>'.
+    # 💥 FIX: The 'outputs' property is NOT allowed here and has been removed.
+    # The output is still available to jobs that 'need' this job.
     with:
       node-version: '20'
       ref: ${{ github.ref }}
       stage: ${{ github.ref_name }}
       deployment_environment: ci
     secrets:
-      # Removed 'repo_token' (GITHUB_TOKEN) from this list as requested/it's not needed for the build
+      # Note: 'repo_token' is not needed by the reusable build workflow
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
@@ -50,7 +50,7 @@ jobs:
       deployment_environment: code-review
       tag: ${{ github.ref_name }}
       node-version: '20'
-      # 🔑 This correctly pulls the output from the reusable workflow:
+      # 🔑 Accessing output correctly from the needs context:
       artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
@@ -69,7 +69,7 @@ jobs:
       deployment_environment: uat
       tag: ${{ github.ref_name }}
       node-version: '20'
-      # 🔑 This correctly pulls the output from the reusable workflow:
+      # 🔑 Accessing output correctly from the needs context:
       artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
@@ -88,7 +88,7 @@ jobs:
       deployment_environment: prod-test
       tag: ${{ github.ref_name }}
       node-version: '20'
-      # 🔑 This correctly pulls the output from the reusable workflow:
+      # 🔑 Accessing output correctly from the needs context:
       artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
@@ -107,7 +107,7 @@ jobs:
       deployment_environment: production
       tag: ${{ github.ref_name }}
       node-version: '20'
-      # 🔑 This correctly pulls the output from the reusable workflow:
+      # 🔑 Accessing output correctly from the needs context:
       artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
@@ -115,7 +115,7 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  # 6. CREATE GITHUB RELEASE
+  # 6. CREATE GITHUB RELEASE (Runs after deployment is triggered)
   create-release:
     name: 📝 Create GitHub Release
     if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v')
@@ -127,7 +127,6 @@ jobs:
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
-          # GITHUB_TOKEN is required for this action
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name }}
