@@ -20,14 +20,6 @@ import { getServerSideURL } from './utilities/getURL'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// 🟢 FIX: Define the connection string based on the CI_BUILD flag.
-// If CI_BUILD is true, we use a non-connective, but valid URI to bypass connection during static build.
-// Otherwise, it uses your provided DATABASE_URI.
-const connectionString =
-  process.env.CI_BUILD === 'true'
-    ? 'postgresql://placeholder:placeholder@localhost/placeholder?sslmode=disable' // Safe placeholder URI
-    : process.env.DATABASE_URI // Use your actual URI if not in CI build
-
 export default buildConfig({
   admin: {
     components: {
@@ -67,15 +59,11 @@ export default buildConfig({
   },
   // This config helps us configure global or default features that the other editors can inherit
   editor: defaultLexical,
-
-  // 🟢 APPLY THE CORRECTED CONNECTION STRING LOGIC
   db: postgresAdapter({
     pool: {
-      // Use the conditionally defined connectionString here
-      connectionString: connectionString || '', // Fall back to empty string if both are missing
+      connectionString: process.env.DATABASE_URI || '',
     },
   }),
-
   collections: [Pages, Posts, Media, Categories, Users],
   cors: [getServerSideURL()].filter(Boolean),
   globals: [Header, Footer],
@@ -95,10 +83,12 @@ export default buildConfig({
         if (req.user) return true
 
         // If there is no logged in user, then check
-        // for the Vercel Cron secret to be present...
-        // ...
-        return false
+        // for the Vercel Cron secret to be present as an
+        // Authorization header:
+        const authHeader = req.headers.get('authorization')
+        return authHeader === `Bearer ${process.env.CRON_SECRET}`
       },
     },
+    tasks: [],
   },
 })
