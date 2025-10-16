@@ -2,17 +2,16 @@ name: Full CD Pipeline (Review -> UAT -> Prod)
 
 on:
   push:
-    branches:
-      - develop # Workflow will now trigger on pushes to the 'develop' branch
+    tags:
+      - 'v*.*.*' # Workflow triggers ONLY on pushes of tags.
   workflow_dispatch: # Allows manual trigger for testing
 
 jobs:
-  # 1. First stage: Code Review & Initial Build Setup
-  # This job simulates the initial successful compilation and quality gate.
+  # 1. First stage: Code Review & Initial Build Setup (Creates the initial artifact)
   code-review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Tagged Code
         uses: actions/checkout@v4
       - name: Setup Node.js Environment
         uses: actions/setup-node@v4
@@ -22,50 +21,73 @@ jobs:
         run: npm ci
       - name: Run Linting and Static Analysis
         run: |
-          echo "Running ESLint and Static Analysis..."
+          echo "Running ESLint and Static Analysis on Tag: ${{ github.ref_name }}"
           echo "Analysis completed. Code quality checks passed."
+      # ----------------------------------------------------
+      # NOTE: This is where your actual build command goes (e.g., npm run build)
+      - name: Build and Store Initial Artifact
+        id: build
+        run: |
+          mkdir -p build_output
+          echo "Simulated build for tag ${{ github.ref_name }}" > build_output/app.txt
+      # Save the artifact so downstream jobs can deploy the *same* binary
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifact-${{ github.ref_name }}
+          path: build_output/
 
   # 2. Second stage: UAT (User Acceptance Testing) deployment and tests
   uat:
     needs: code-review
     runs-on: ubuntu-latest
+    environment:
+      name: UAT # Requires manual approval before running
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Build UAT Artifact
-        run: echo "Building application artifact for UAT."
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-artifact-${{ github.ref_name }}
+          path: ./downloaded-artifact
       - name: Deploy to UAT Environment
-        run: echo "Deploying artifacts to UAT environment for testing."
+        # Explicitly referencing the tag in the deployment log
+        run: echo "Deploying approved artifact from tag ${{ github.ref_name }} to UAT."
       - name: Run UAT Smoke Tests
-        run: echo "UAT tests complete. Environment verified."
+        run: echo "UAT tests complete. Environment verified for tag ${{ github.ref_name }}."
 
   # 3. Third stage: Pre-Production/Production-Test environment checks
   prod-test:
     needs: uat
     runs-on: ubuntu-latest
+    environment:
+      name: Prod-Test # Requires manual approval before running
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Build Prod-Test Artifact
-        run: echo "Building application artifact for Prod-Test."
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-artifact-${{ github.ref_name }}
+          path: ./downloaded-artifact
       - name: Deploy to Production Test Environment
-        run: echo "Deploying to prod-test environment."
+        # Explicitly referencing the tag in the deployment log
+        run: echo "Deploying APPROVED artifact from UAT to Prod-Test for tag ${{ github.ref_name }}."
       - name: Run End-to-End Production Tests
-        run: echo "Prod-test E2E complete. Artifacts are ready for production."
+        run: echo "Prod-test E2E complete. Artifacts are ready for production for tag ${{ github.ref_name }}."
 
   # 4. Fourth stage: Final Production Deployment
   deploy-production:
     needs: prod-test
     runs-on: ubuntu-latest
     environment:
-      name: Production
+      name: Production # Requires manual approval before running
       url: https://your-production-app.com
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Build Production Artifact
-        run: echo "Building final production artifact."
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-artifact-${{ github.ref_name }}
+          path: ./downloaded-artifact
       - name: Deploy to Final Production
-        run: echo "Deployment to PRODUCTION environment successful."
+        # Explicitly referencing the tag in the deployment log
+        run: echo "Deploying APPROVED artifact from Prod-Test to PRODUCTION for tag ${{ github.ref_name }}."
       - name: Final Health Check
-        run: echo "Production health checks passed."
+        run: echo "Production health checks passed for tag ${{ github.ref_name }}."
