@@ -12,11 +12,16 @@ on:
         required: true
         type: string
       deployment_environment:
-        required: true # Environment is required for gating
+        required: true
         type: string
       tag:
-        required: true # Tag is REQUIRED for this flow
+        required: true
         type: string
+      # 💥 CRITICAL FIX: Add the missing input
+      artifact-name:
+        required: false # Set to true if deployment MUST use an artifact
+        type: string
+        default: '' # Provide a default if it's not strictly required
     secrets:
       PAYLOAD_SECRET:
         required: false
@@ -47,16 +52,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # CRITICAL: Checkout the specific tag
           ref: refs/tags/${{ inputs.tag }}
 
-      - name: Trigger Render Deploy Hook
-        if: ${{ env.RENDER_HOOK != '' }}
-        run: |
-          echo "Triggering Render for stage=${{ inputs.stage }} from tag=${{ inputs.tag }}..."
-          # The curl command can optionally send the tag/commit info to Render if your setup expects it
-          curl -X POST -sSf "${{ env.RENDER_HOOK }}" \
-            -H "Content-Type: application/json" \
-            -d "{ \"tag\": \"${{ inputs.tag }}\", \"commit_sha\": \"${{ github.sha }}\" }" \
-            -w "\nHTTP %{http_code}\n"
-          echo "${{ inputs.stage }} deployment successfully triggered in Render."
+      # 💥 CRITICAL FIX: Add the step to download the built artifact
+      - name: Download Artifact from Build
+        if: ${{ inputs.artifact-name != '' }} # Only run if an artifact name was provided
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: . # Downloads contents into the root of the runner workspace
