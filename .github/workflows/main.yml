@@ -1,18 +1,43 @@
+# .github/workflows/main.yml
 name: CI → Code-Review → UAT → Production
 
 on:
   push:
+    # 💡 FIX 1: Trigger pipeline on push to the develop branch
     branches:
-      - main
+      - develop
   pull_request:
+    # 💡 FIX 2: Trigger pipeline on PRs targeting the develop branch
     branches:
-      - main
+      - develop
 
 permissions:
   contents: read
 
 jobs:
+  # ==========================================================
+  # 1. CI BUILD STAGE (Runs on every push/PR to develop)
+  # ==========================================================
+  ci-build:
+    name: 🏗️ CI Build
+    uses: ./.github/workflows/build.yml
+    with:
+      # Pass 'develop' as the stage for artifact naming
+      stage: develop
+      node-version: '20'
+      deployment_environment: ci
+    secrets:
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+
+  # ==========================================================
+  # 2. CODE REVIEW STAGE (For PRs)
+  # ==========================================================
   code-review:
+    # Runs only on Pull Requests (e.g., when a feature branch targets develop)
+    if: github.event_name == 'pull_request'
+    needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
       stage: code-review
@@ -21,24 +46,31 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
+  # ==========================================================
+  # 3. UAT DEPLOYMENT (Triggered by successful push/merge to develop)
+  # ==========================================================
   uat:
-    needs: code-review
+    # Runs only on push events and requires a successful build
+    if: github.event_name == 'push' && success()
+    needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
       stage: uat
       deployment_environment: uat
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # 💡 FIX 3: Use the UAT hook for the develop branch deployment
       render_hook: ${{ secrets.RENDER_UAT_HOOK }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
 
+  # ==========================================================
+  # 4. PRODUCTION DEPLOYMENT (Placeholder - typically runs only from main)
+  # ==========================================================
   production:
-    needs: uat
-    uses: ./.github/workflows/deploy.yml
-    with:
-      stage: production
-      deployment_environment: production
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      render_hook: ${{ secrets.RENDER_PROD_HOOK }}
-      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+    # This job is usually manual or triggered by a merge to 'main'.
+    # Leaving it disabled here until 'main' is used for production merges.
+    if: always() && false
+    name: ⛔ Production (Disabled)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Production deployment is currently disabled and should only run from the 'main' branch."

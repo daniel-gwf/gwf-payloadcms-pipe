@@ -1,4 +1,5 @@
-name: Reusable Deploy Workflow (tag-triggered)
+# .github/workflows/deploy.yml
+name: Reusable Deploy Workflow
 
 on:
   workflow_call:
@@ -26,7 +27,7 @@ on:
 
 jobs:
   deploy:
-    name: "Deploy for ${{ inputs.stage }} (tag: ${{ inputs.tag || github.ref_name }})"
+    name: "Deploy for ${{ inputs.stage }}"
     runs-on: ubuntu-latest
     environment: ${{ inputs.deployment_environment }}
     permissions:
@@ -35,38 +36,22 @@ jobs:
     env:
       NODE_ENV: production
       DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
-      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       RENDER_HOOK: ${{ secrets.render_hook }}
 
     steps:
-      - name: Checkout tagged commit
+      - name: Checkout Code (Needed for Render deploy hook)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-          cache: "npm"
+      # 💡 FIX 1: Removed redundant Setup Node.js, npm ci, npm run build steps.
+      # The app is built in the ci-build job.
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run lint
-        run: npm run lint || true
-
-      - name: Run build
-        run: npm run build
-
-      - name: Package build output
-        run: |
-          mkdir -p build-output
-          zip -r build-output/build-${{ inputs.stage }}-${{ github.sha }}.zip build dist || true
-
-      - name: Trigger Render (UAT/Production only)
+      - name: Trigger Render Deploy Hook
         if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
         run: |
-          echo "Triggering Render for stage=${{ inputs.stage }} (tag=${{ env.DEPLOY_TAG }})"
+          echo "Triggering Render for stage=${{ inputs.stage }}..."
+          # Render will check out the latest commit on the associated branch (e.g., 'develop')
+          # and then rebuild the service using its internal CI process.
           curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'

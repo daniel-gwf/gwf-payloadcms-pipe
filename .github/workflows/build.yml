@@ -1,3 +1,4 @@
+# .github/workflows/build.yml
 name: Build Workflow (Reusable)
 
 on:
@@ -36,8 +37,8 @@ jobs:
 
     env:
       RENDER_HOOK: ${{ secrets.render_hook }}
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
+      PAYLOAD_SECRET_ENV: ${{ secrets.PAYLOAD_SECRET }}
 
     steps:
       - name: Checkout code
@@ -51,8 +52,8 @@ jobs:
 
       - name: Authenticate npm (optional)
         run: |
-          if [ -n "${NPM_TOKEN}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          if [ -n "${NPM_TOKEN_ENV}" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN_ENV}" > ~/.npmrc
           else
             echo "No NPM_TOKEN provided — skipping npm authentication"
           fi
