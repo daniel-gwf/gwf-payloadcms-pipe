@@ -1,18 +1,14 @@
-name: Full CD Pipeline (Review -> UAT -> Prod -> Release)
+name: Full CD Pipeline (Review -> UAT -> Prod)
 
 on:
   push:
     branches:
-      - develop # CHANGED: Workflow will now trigger on pushes to the 'develop' branch
+      - develop # Workflow will now trigger on pushes to the 'develop' branch
   workflow_dispatch: # Allows manual trigger for testing
 
-# CRITICAL FIX: Set permissions at the workflow level to ensure the GITHUB_TOKEN has write
-# access globally. This is the most reliable way to grant permissions needed for the Release step.
-permissions:
-  contents: write # This grants the necessary permission for the release step
-
 jobs:
-  # 1. First stage: Static analysis and basic checks
+  # 1. First stage: Code Review & Initial Build Setup
+  # This job simulates the initial successful compilation and quality gate.
   code-review:
     runs-on: ubuntu-latest
     steps:
@@ -23,12 +19,10 @@ jobs:
         with:
           node-version: '20'
       - name: Install Dependencies
-        run: npm ci # This reads your package.json and installs required modules.
+        run: npm ci
       - name: Run Linting and Static Analysis
-        # This step now represents the actual code reading/analysis, using tools like ESLint or SonarQube.
         run: |
           echo "Running ESLint and Static Analysis..."
-          # Replace this placeholder command with your actual lint/test command
           echo "Analysis completed. Code quality checks passed."
 
   # 2. Second stage: UAT (User Acceptance Testing) deployment and tests
@@ -36,6 +30,10 @@ jobs:
     needs: code-review
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build UAT Artifact
+        run: echo "Building application artifact for UAT."
       - name: Deploy to UAT Environment
         run: echo "Deploying artifacts to UAT environment for testing."
       - name: Run UAT Smoke Tests
@@ -46,13 +44,16 @@ jobs:
     needs: uat
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build Prod-Test Artifact
+        run: echo "Building application artifact for Prod-Test."
       - name: Deploy to Production Test Environment
         run: echo "Deploying to prod-test environment."
       - name: Run End-to-End Production Tests
         run: echo "Prod-test E2E complete. Artifacts are ready for production."
 
   # 4. Fourth stage: Final Production Deployment
-  # The write permission is now set globally, making this job simpler.
   deploy-production:
     needs: prod-test
     runs-on: ubuntu-latest
@@ -60,25 +61,11 @@ jobs:
       name: Production
       url: https://your-production-app.com
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build Production Artifact
+        run: echo "Building final production artifact."
       - name: Deploy to Final Production
         run: echo "Deployment to PRODUCTION environment successful."
       - name: Final Health Check
         run: echo "Production health checks passed."
-
-  # 5. Final stage: Create the Release
-  create-release:
-    needs: deploy-production
-    runs-on: ubuntu-latest
-    steps:
-      - name: Determine New Version/Tag (Example Step)
-        id: tag_info
-        run: echo "VERSION=v1.2.3" >> $GITHUB_ENV
-      - name: Create GitHub Release
-        # This step now has the necessary 'contents: write' permission from the workflow level.
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.VERSION }}
-          name: Release ${{ env.VERSION }}
-          body: "Automated production release after successful deployment."
-          draft: false
-          prerelease: false
