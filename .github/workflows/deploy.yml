@@ -36,10 +36,9 @@ jobs:
   deploy:
     name: "Deploy for ${{ inputs.stage }}"
     runs-on: ubuntu-latest
-    # CRITICAL: Uses the environment name for GitHub protection rules (required reviewers)
     environment: ${{ inputs.deployment_environment }}
     permissions:
-      contents: read
+      contents: write # 👈 CRITICAL: MUST be 'write' for pushing to a branch
     env:
       NODE_ENV: production
       DEPLOY_TAG: ${{ inputs.tag }} # The clean tag name (e.g., v1.0.0)
@@ -52,12 +51,30 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Checkout the specific tag commit
           ref: refs/tags/${{ inputs.tag }}
 
-      # 💥 CRITICAL FIX: Add the step to download the built artifact
-      - name: Download Artifact from Build
-        if: ${{ inputs.artifact-name != '' }} # Only run if an artifact name was provided
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.artifact-name }}
-          path: . # Downloads contents into the root of the runner workspace
+      - name: 🚀 Force Push Tag Commit to Render Deployment Branch
+        if: ${{ inputs.stage == 'uat' || inputs.stage == 'production' }} # Only run for UAT/Prod deployments
+        run: |
+          # 1. Configure Git identity
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions-bot@users.noreply.github.com"
+
+          # 2. Determine the target branch based on the stage
+          TARGET_BRANCH="render-deploy-${{ inputs.stage }}"
+
+          # 3. Create a temporary branch at the tag's commit and force push it
+          # -f (force) is needed to overwrite the branch's history with the single tag commit.
+          # We use the GITHUB_TOKEN for authentication.
+          echo "Force pushing tag ${{ inputs.tag }} to branch $TARGET_BRANCH"
+          git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }} \
+            origin HEAD:$TARGET_BRANCH
+
+      - name: Trigger Render Deploy Hook
+        # The hook is now just a signal to Render that its watch branch (render-deploy-uat) is updated
+        if: ${{ env.RENDER_HOOK != '' }}
+        run: |
+          echo "Triggering Render for stage=${{ inputs.stage }}..."
+          curl -X POST -sSf "${{ env.RENDER_HOOK }}" \
+            -w "\nHTTP Status: %{http_code}\n"
