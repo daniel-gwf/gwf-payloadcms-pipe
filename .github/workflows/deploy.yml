@@ -1,5 +1,5 @@
 # .github/workflows/deploy.yml
-name: Reusable Deploy Workflow
+name: Reusable Deploy Workflow (Tag-based)
 
 on:
   workflow_call:
@@ -12,19 +12,18 @@ on:
         required: true
         type: string
       deployment_environment:
-        required: false
+        required: true # Environment is required for gating
         type: string
       tag:
-        required: false
+        required: true # Tag is REQUIRED for this flow
         type: string
     secrets:
       PAYLOAD_SECRET:
         required: false
       render_hook:
-        required: false
+        required: true # The hook is mandatory for deployment
       NPM_TOKEN:
         required: false
-      # 🔑 FIX: Accept DATABASE_URI as an input secret
       DATABASE_URI:
         required: false
 
@@ -32,30 +31,32 @@ jobs:
   deploy:
     name: "Deploy for ${{ inputs.stage }}"
     runs-on: ubuntu-latest
+    # CRITICAL: Uses the environment name for GitHub protection rules (required reviewers)
     environment: ${{ inputs.deployment_environment }}
     permissions:
       contents: read
-
     env:
       NODE_ENV: production
-      DEPLOY_TAG: ${{ inputs.tag || github.ref_name }}
+      DEPLOY_TAG: ${{ inputs.tag }} # The clean tag name (e.g., v1.0.0)
       RENDER_HOOK: ${{ secrets.render_hook }}
       SECRET_KEY: ${{ secrets.PAYLOAD_SECRET }}
-      # 🔑 FIX: Expose DATABASE_URI as an environment variable
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # The CI_BUILD flag is commented out/removed to force a database connection
 
     steps:
-      - name: Checkout Code (Needed for Render deploy hook)
+      - name: Checkout Code (The exact tagged commit)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag || github.ref }}
+          # CRITICAL: Checkout the specific tag
+          ref: refs/tags/${{ inputs.tag }}
 
-
-      # Trigger Render Deploy Hook...
       - name: Trigger Render Deploy Hook
-        if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
+        if: ${{ env.RENDER_HOOK != '' }}
         run: |
-          echo "Triggering Render for stage=${{ inputs.stage }}..."
-          curl -X POST -sSf -H "Content-Type: application/json" "${{ env.RENDER_HOOK }}" -d '{}'
+          echo "Triggering Render for stage=${{ inputs.stage }} from tag=${{ inputs.tag }}..."
+          # The curl command can optionally send the tag/commit info to Render if your setup expects it
+          curl -X POST -sSf "${{ env.RENDER_HOOK }}" \
+            -H "Content-Type: application/json" \
+            -d "{ \"tag\": \"${{ inputs.tag }}\", \"commit_sha\": \"${{ github.sha }}\" }" \
+            -w "\nHTTP %{http_code}\n"
+          echo "${{ inputs.stage }} deployment successfully triggered in Render."

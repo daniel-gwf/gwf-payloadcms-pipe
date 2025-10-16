@@ -1,77 +1,138 @@
 # .github/workflows/main.yml
-name: CI → Code-Review → UAT → Production
+name: 🚀 Fully Tag-Triggered CI/CD Pipeline
 
 on:
   push:
-    # Trigger pipeline on push/merge to the develop branch
-    branches:
-      - develop
-  pull_request:
-    # Trigger pipeline on PRs targeting the develop branch
-    branches:
-      - develop
+    tags:
+      # Tags used for deployment to specific environments
+      - 'cr-v[0-9]+.[0-9]+.[0-9]+*'
+      - 'uat-v[0-9]+.[0-9]+.[0-9]+*'
+      - 'test-v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   # ==========================================================
-  # 1. CI BUILD STAGE (Mandatory first step)
+  # 1. CI BUILD STAGE (Runs on the exact commit of the pushed tag)
   # ==========================================================
   ci-build:
-    name: 🏗️ CI Build
+    name: 🏗️ CI Build for ${{ github.ref_name }}
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/build.yml
+    # 💥 FIX: Removed the 'outputs' property here. It is NOT allowed on jobs that use 'uses:'.
+    # The output from the reusable workflow is still available via 'needs.ci-build.outputs.<output-name>'.
     with:
-      stage: develop
       node-version: '20'
+      ref: ${{ github.ref }}
+      stage: ${{ github.ref_name }}
       deployment_environment: ci
     secrets:
-      repo_token: ${{ secrets.GITHUB_TOKEN }}
+      # Removed 'repo_token' (GITHUB_TOKEN) from this list as requested/it's not needed for the build
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  # ==========================================================
-  # 2. CODE REVIEW STAGE (New Mandatory Deployment Stage)
-  # 💡 FIX 1: Removed 'if: github.event_name == 'pull_request'' to ensure it runs on push/merge.
-  # This makes it a mandatory stage that UAT can depend on.
-  # ==========================================================
+  # ----------------------------------------------------------
+  # Deployment Stages (Conditional based on Tag)
+  # ----------------------------------------------------------
+
+  # 2. CODE REVIEW DEPLOYMENT (cr-v* tags)
   code-review:
+    name: 🧐 Code Review Deploy
+    if: success() && startsWith(github.ref, 'refs/tags/cr-v')
     needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
       stage: code-review
       deployment_environment: code-review
+      tag: ${{ github.ref_name }}
+      node-version: '20'
+      # 🔑 This correctly pulls the output from the reusable workflow:
+      artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      render_hook: ${{ secrets.RENDER_CR_HOOK }} # Assumed secret name
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  # ==========================================================
-  # 3. UAT DEPLOYMENT
-  # 💡 FIX 2: Change needs to code-review.
-  # ==========================================================
+  # 3. UAT DEPLOYMENT (uat-v* tags)
   uat:
-    # 🟢 CRITICAL FIX: UAT now strictly requires code-review to complete.
-    needs: code-review
-    # Runs only on push events (i.e., when a PR is merged into develop).
-    if: github.event_name == 'push' && success() && github.ref == 'refs/heads/develop'
+    name: 🌐 UAT Deployment
+    if: success() && startsWith(github.ref, 'refs/tags/uat-v')
+    needs: ci-build
     uses: ./.github/workflows/deploy.yml
     with:
       stage: uat
       deployment_environment: uat
+      tag: ${{ github.ref_name }}
+      node-version: '20'
+      # 🔑 This correctly pulls the output from the reusable workflow:
+      artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
     secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      render_hook: ${{ secrets.RENDER_UAT_HOOK }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      render_hook: ${{ secrets.RENDER_UAT_HOOK }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  # ==========================================================
-  # 4. PRODUCTION DEPLOYMENT (Placeholder)
-  # ==========================================================
-  production:
-    if: always() && false
-    name: ⛔ Production (Disabled)
+  # 4. PROD-TEST DEPLOYMENT (test-v* tags)
+  deploy-prod-test:
+    name: 🧪 Prod-Test Deployment (Gated)
+    if: success() && startsWith(github.ref, 'refs/tags/test-v')
+    needs: ci-build
+    uses: ./.github/workflows/deploy.yml
+    with:
+      stage: prod-test
+      deployment_environment: prod-test
+      tag: ${{ github.ref_name }}
+      node-version: '20'
+      # 🔑 This correctly pulls the output from the reusable workflow:
+      artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
+    secrets:
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      render_hook: ${{ secrets.RENDER_PROD_TEST_HOOK }} # Assumed secret name
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      DATABASE_URI: ${{ secrets.DATABASE_URI }}
+
+  # 5. PRODUCTION DEPLOYMENT (v* tags)
+  deploy-production:
+    name: 🚀 Production Deployment (Gated)
+    if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v')
+    needs: ci-build
+    uses: ./.github/workflows/deploy.yml
+    with:
+      stage: production
+      deployment_environment: production
+      tag: ${{ github.ref_name }}
+      node-version: '20'
+      # 🔑 This correctly pulls the output from the reusable workflow:
+      artifact-name: ${{ needs.ci-build.outputs.artifact-name }}
+    secrets:
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      render_hook: ${{ secrets.RENDER_PROD_HOOK }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      DATABASE_URI: ${{ secrets.DATABASE_URI }}
+
+  # 6. CREATE GITHUB RELEASE
+  create-release:
+    name: 📝 Create GitHub Release
+    if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v')
+    needs: deploy-production
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed for creating a release
     steps:
-      - run: echo "Production deployment is currently disabled and should only run from the 'main' branch or tag."
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          # GITHUB_TOKEN is required for this action
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            Production deployment triggered successfully for version ${{ github.ref_name }}.
+          draft: false
+          prerelease: false

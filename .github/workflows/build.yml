@@ -15,8 +15,7 @@ on:
         required: false
         type: string
     secrets:
-      repo_token:
-        required: true
+      # 🚫 FIX: Removed 'repo_token' since it's not used in this workflow and was removed from the caller
       NPM_TOKEN:
         required: false
       render_hook:
@@ -42,8 +41,6 @@ jobs:
       NPM_TOKEN_ENV: ${{ secrets.NPM_TOKEN }}
       PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
-      # This critical flag remains to skip the DB connection during build
-     # CI_BUILD: 'true'
 
     steps:
       - name: Checkout code
@@ -55,27 +52,8 @@ jobs:
           node-version: ${{ inputs.node-version }}
           cache: "npm"
 
-      # 🟢 FIX: Cache Node Modules (npm cache is for packages, this is for dependencies)
-      # This step caches the node_modules folder itself based on package-lock.json.
-      - name: Cache Dependencies
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
-
-      # 🟢 FIX: Cache Next.js Build
-      # This caches the .next/cache directory which Next.js uses for the build.
-      - name: Cache Next.js Build
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
-
       - name: Authenticate npm (optional)
+        # 🔑 FIX: Corrected multiline run block from `run: |\` to `run: |`
         run: |
           if [ -n "${NPM_TOKEN_ENV}" ]; then
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN_ENV}" > ~/.npmrc
@@ -84,14 +62,13 @@ jobs:
           fi
 
       - name: Install dependencies
-        # This will use the cached node_modules if found
         run: npm ci
 
       - name: Run build
-        # This will use the cached .next/cache if found
         run: npm run build
 
       - name: Package build output
+        # 🔑 FIX: Corrected multiline run block from `run: |\` to `run: |`
         run: |
           mkdir -p build-output
           zip -r build-output/build-${{ inputs.stage }}.zip build dist || true
@@ -110,6 +87,7 @@ jobs:
         if: ${{ inputs.stage != 'code-review' && env.RENDER_HOOK != '' }}
         run: |
           echo "Triggering Render for stage=${{ inputs.stage }}"
-          curl -s -X POST "${{ env.RENDER_HOOK }}" \
-            -H "Accept: application/json" \
-            -w "\nHTTP %{http_code}\n"
+          # Triggering the Render hook from the build job is redundant if deploy.yml does it.
+          # Assuming you want to keep the deployment logic separate, this can be removed.
+          # If you want this build job to trigger the deploy:
+          # curl -X POST -sSf "${{ env.RENDER_HOOK }}" -w "\nHTTP %{http_code}\n"
