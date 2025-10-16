@@ -1,7 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { CollectionAfterReadHook } from 'payload'
-import type { Hook } from 'payload/types'
-import { User } from 'src/payload-types'
+import type { CollectionAfterReadHook, CollectionBeforeChangeHook, User } from 'payload' // 💡 FIX: Used CollectionBeforeChangeHook
 
 // Named after-read hook used by your collection import
 export const populateAuthors: CollectionAfterReadHook = async ({ doc, req: _req }: any) => {
@@ -40,7 +38,8 @@ export const populateAuthors: CollectionAfterReadHook = async ({ doc, req: _req 
 }
 
 // Default hook: normalize authors on create/update
-const normalizeAuthorsHook: Hook = async ({ data, _req }: any) => {
+const normalizeAuthorsHook: CollectionBeforeChangeHook = async ({ data, _req }: any) => {
+  // 💡 FIX: Used CollectionBeforeChangeHook
   if (!data) return data
 
   if (Array.isArray((data as any).authors)) {

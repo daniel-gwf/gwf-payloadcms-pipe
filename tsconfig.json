@@ -3,6 +3,9 @@
     "strict": true,
     "baseUrl": ".",
     "esModuleInterop": true,
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
     "target": "ES2022",
     "lib": [
       "DOM",
