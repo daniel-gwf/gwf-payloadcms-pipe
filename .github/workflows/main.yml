@@ -100,11 +100,13 @@ jobs:
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
   # 5. PRODUCTION DEPLOYMENT (v* tags)
+  # 5. PRODUCTION DEPLOYMENT (v* tags)
   deploy-production:
     name: 🚀 Production Deployment (Gated)
     if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v')
     needs: ci-build
-    # 🔑 CRITICAL FIX: Add permissions here
+    # 🔑 CRITICAL FIX: Grant 'contents: write' permission here.
+    # This is required because the dependent job (create-release) needs it.
     permissions:
       contents: write
     uses: ./.github/workflows/deploy.yml
@@ -120,33 +122,16 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       DATABASE_URI: ${{ secrets.DATABASE_URI }}
 
-  # 6. CREATE GITHUB RELEASE (Runs after Production deployment)
+  # 6. CREATE GITHUB RELEASE (Runs after Production deployment is triggered)
   create-release:
     name: 📝 Create GitHub Release
     # This condition ensures it only runs on the final production tag (e.g., v1.0.0)
     if: success() && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/uat-v') && !startsWith(github.ref, 'refs/tags/test-v') && !startsWith(github.ref, 'refs/tags/cr-v')
-    needs: deploy-production # Must run after the production deployment job finishes
+    needs: deploy-production # The correct sequence is preserved: Deploy must finish before Release is created.
     runs-on: ubuntu-latest
     permissions:
       # CRITICAL: This permission is required to create a GitHub Release
       contents: write
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          # Checkout the specific tag that triggered the workflow
-          ref: ${{ github.ref }}
-
       - name: Create GitHub Release
         uses: actions/create-release@v1
-        env:
-          # GITHUB_TOKEN is available automatically
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            Automatic GitHub Release for tag **${{ github.ref_name }}**.
-            Commit: ${{ github.sha }}
-          draft: false
-          prerelease: false
